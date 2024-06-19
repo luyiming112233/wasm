@@ -1,7 +1,6 @@
 package decode
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/luyiming112233/wasm/common"
 	"github.com/stretchr/testify/assert"
@@ -15,8 +14,12 @@ func TestModule(t *testing.T) {
 
 	sb := common.NewSliceBytes(buf)
 	module, err := DecodeModule(sb)
+	if module != nil {
+		fmt.Println(module.display())
+	}
+
 	assert.Nil(t, err)
 
-	data, err := json.Marshal(module)
-	fmt.Println(string(data))
+	//data, err := json.Marshal(module)
+	//fmt.Println(string(data))
 }

@@ -56,3 +56,21 @@ func (bt *SliceBytes) ReadUint32() (uint32, error) {
 
 	return binary.LittleEndian.Uint32(data), nil
 }
+
+func (bt *SliceBytes) Remaining() int {
+	return len(bt.bs) - bt.pc
+}
+
+func (bt *SliceBytes) ReadName() (string, int, error) {
+	// 读取name的长度
+	nameLen, _, err := DecodeInt32(bt)
+	if err != nil {
+		return "", 0, err
+	}
+	// 读取name
+	name, err := bt.ReadByteN(int(nameLen))
+	if err != nil {
+		return "", 0, err
+	}
+	return string(name), int(nameLen), nil
+}
