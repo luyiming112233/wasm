@@ -16,19 +16,27 @@ type FuncType struct {
 }
 
 type TableType struct {
-	// todo
+	Tag       byte // 0x70
+	LimitsRef *Limits
 }
 
 type MemType struct {
-	// todo
+	LimitsRef *Limits
+}
+
+type Limits struct {
+	Tag byte
+	Min uint32
+	Max uint32
 }
 
 type GlobalType struct {
-	// todo
+	ValType ValType
+	Mutable bool
 }
 
 type Expr struct {
-	// todo
+	Data []byte
 }
 
 type ValType byte
@@ -42,4 +50,14 @@ const (
 
 const (
 	TagFuncType byte = 0x60
+)
+
+const (
+	LimitsFlagNoMax  byte = 0x00
+	LimitsFlagHasMax byte = 0x01
+)
+
+const (
+	NotMutable byte = 0x00
+	Mutable    byte = 0x01
 )

@@ -38,6 +38,9 @@ const (
 	ImportTagMem    = 2
 	ImportTagGlobal = 3
 )
+
+const TableTypeTag = 0x70
+
 const (
 	ExportTagFunc   = 0
 	ExportTagTable  = 1
@@ -49,8 +52,8 @@ type Module struct {
 	Magic      uint32
 	Version    uint32
 	CustomSecs []CustomSec
-	TypeSec    []common.FuncType
-	ImportSec  []Import
+	TypeSec    []*common.FuncType
+	ImportSec  []*Import
 	FuncSec    []common.TypeIdx
 	TableSec   []common.TableType
 	MemSec     []common.MemType
@@ -103,12 +106,13 @@ type Import struct {
 	Name   string
 	Desc   ImportDesc
 }
+
 type ImportDesc struct {
 	Tag      byte
-	FuncType common.TypeIdx    // tag=0
-	Table    common.TableType  // tag=1
-	Mem      common.MemType    // tag=2
-	Global   common.GlobalType // tag=3
+	FuncType common.TypeIdx     // tag=0
+	Table    *common.TableType  // tag=1
+	Mem      *common.MemType    // tag=2
+	Global   *common.GlobalType // tag=3
 }
 
 type Global struct {
@@ -254,39 +258,45 @@ func (module *Module) decodeTypeSection(bs *common.SliceBytes) error {
 		return err
 	}
 
-	module.TypeSec = make([]common.FuncType, 0, typeCount)
+	module.TypeSec = make([]*common.FuncType, 0, typeCount)
 
 	for i := int32(0); i < typeCount; i++ {
-		// read type
-		tagType, err := bs.ReadByte()
+		funcType, err := decodeFuncType(bs)
 		if err != nil {
-			return fmt.Errorf("decodeTypeSection type failed %s", err.Error())
+			return err
 		}
-		// 检查是否是TagFuncType
-		if tagType != common.TagFuncType {
-			return fmt.Errorf("decodeTypeSection invalid type %b", tagType)
-		}
-
-		// 解析输入参数
-		inputTypes, err := decodeValueTypes(bs)
-		if err != nil {
-			return fmt.Errorf("decodeTypeSection inputs failed %s", err.Error())
-		}
-
-		// 解析函数返回值
-		returnTypes, err := decodeValueTypes(bs)
-		if err != nil {
-			return fmt.Errorf("decodeTypeSection returns failed %s", err.Error())
-		}
-
-		funcType := common.FuncType{
-			InputTypes:  inputTypes,
-			ReturnTypes: returnTypes,
-		}
-
 		module.TypeSec = append(module.TypeSec, funcType)
 	}
 	return nil
+}
+
+func decodeFuncType(bs *common.SliceBytes) (*common.FuncType, error) {
+	// read type
+	tagType, err := bs.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("decodeTypeSection type failed %s", err.Error())
+	}
+	// 检查是否是TagFuncType
+	if tagType != common.TagFuncType {
+		return nil, fmt.Errorf("decodeTypeSection invalid type %b", tagType)
+	}
+
+	// 解析输入参数
+	inputTypes, err := decodeValueTypes(bs)
+	if err != nil {
+		return nil, fmt.Errorf("decodeTypeSection inputs failed %s", err.Error())
+	}
+
+	// 解析函数返回值
+	returnTypes, err := decodeValueTypes(bs)
+	if err != nil {
+		return nil, fmt.Errorf("decodeTypeSection returns failed %s", err.Error())
+	}
+
+	return &common.FuncType{
+		InputTypes:  inputTypes,
+		ReturnTypes: returnTypes,
+	}, nil
 }
 
 func decodeValueTypes(bs *common.SliceBytes) ([]common.ValType, error) {
@@ -315,11 +325,187 @@ func decodeValueType(bs *common.SliceBytes) (common.ValType, error) {
 
 // decode Import Section
 func (module *Module) decodeImportSection(bs *common.SliceBytes) error {
+	importCount, _, err := common.DecodeInt32(bs)
+	if err != nil {
+		return err
+	}
+
+	module.ImportSec = make([]*Import, 0, importCount)
+	for i := int32(0); i < importCount; i++ {
+		imp, err := decodeImport(bs)
+		if err != nil {
+			return err
+		}
+		module.ImportSec = append(module.ImportSec, imp)
+	}
+
 	return nil
+}
+
+func decodeImport(bs *common.SliceBytes) (*Import, error) {
+	imp := &Import{}
+	// module name
+	moduleName, _, err := bs.ReadName()
+	if err != nil {
+		return nil, err
+	}
+	imp.Module = moduleName
+
+	// name
+	name, _, err := bs.ReadName()
+	if err != nil {
+		return nil, err
+	}
+	imp.Name = name
+
+	// tag
+	tag, err := bs.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+	imp.Desc.Tag = tag
+
+	switch tag {
+	case ImportTagFunc:
+		// func type
+		funcType, err := decodeTypeIdx(bs)
+		if err != nil {
+			return nil, err
+		}
+		imp.Desc.FuncType = funcType
+	case ImportTagTable:
+		// table type
+		tableType, err := decodeTableType(bs)
+		if err != nil {
+			return nil, err
+		}
+		imp.Desc.Table = tableType
+	case ImportTagMem:
+		// mem type
+		memType, err := decodeMemType(bs)
+		if err != nil {
+			return nil, err
+		}
+		imp.Desc.Mem = memType
+	case ImportTagGlobal:
+		// global type
+		globalType, err := decodeGlobalType(bs)
+		if err != nil {
+			return nil, err
+		}
+		imp.Desc.Global = globalType
+	default:
+		return nil, errors.New("invalid import tag")
+	}
+
+	return imp, nil
+}
+
+func decodeTypeIdx(bs *common.SliceBytes) (common.TypeIdx, error) {
+	idx, _, err := common.DecodeInt32(bs)
+	if err != nil {
+		return 0, err
+	}
+	return common.TypeIdx(idx), nil
+}
+
+func decodeTableType(bs *common.SliceBytes) (*common.TableType, error) {
+	tableTag, err := bs.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+	if tableTag != TableTypeTag {
+		return nil, fmt.Errorf("decodeTableType failed invalid table type tag %b", tableTag)
+	}
+
+	limit, err := decodeLimitsType(bs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &common.TableType{
+		Tag:       tableTag,
+		LimitsRef: limit,
+	}, nil
+}
+
+func decodeMemType(bs *common.SliceBytes) (*common.MemType, error) {
+	limit, err := decodeLimitsType(bs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &common.MemType{
+		LimitsRef: limit,
+	}, nil
+}
+
+func decodeLimitsType(bs *common.SliceBytes) (*common.Limits, error) {
+	tag, err := bs.ReadByte()
+	var minVal, maxVal uint32
+	if err != nil {
+		return nil, err
+	}
+
+	switch tag {
+	case common.LimitsFlagNoMax:
+		minVal, _, err = common.DecodeUint32(bs)
+		if err != nil {
+			return nil, err
+		}
+	case common.LimitsFlagHasMax:
+		minVal, _, err = common.DecodeUint32(bs)
+		if err != nil {
+			return nil, err
+		}
+		maxVal, _, err = common.DecodeUint32(bs)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("decodeLimitsType failed invalid limits tag %b", tag)
+	}
+
+	return &common.Limits{
+		Tag: tag,
+		Min: minVal,
+		Max: maxVal,
+	}, nil
+}
+
+func decodeGlobalType(bs *common.SliceBytes) (*common.GlobalType, error) {
+	globalType := &common.GlobalType{}
+	valType, err := decodeValueType(bs)
+	if err != nil {
+		return nil, err
+	}
+	globalType.ValType = valType
+
+	mutable, err := bs.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+	globalType.Mutable = mutable == common.Mutable
+
+	return globalType, nil
 }
 
 // decode Function Section
 func (module *Module) decodeFunctionSection(bs *common.SliceBytes) error {
+	funcCount, _, err := common.DecodeInt32(bs)
+	if err != nil {
+		return err
+	}
+
+	module.FuncSec = make([]common.TypeIdx, 0, funcCount)
+	for i := int32(0); i < funcCount; i++ {
+		typeIdx, _, err := common.DecodeInt32(bs)
+		if err != nil {
+			return err
+		}
+		module.FuncSec = append(module.FuncSec, common.TypeIdx(typeIdx))
+	}
+
 	return nil
 }
 
@@ -361,45 +547,4 @@ func (module *Module) decodeCodeSection(bs *common.SliceBytes) error {
 // decode Data Section
 func (module *Module) decodeDataSection(bs *common.SliceBytes) error {
 	return nil
-}
-
-func (module *Module) display() string {
-	str := ""
-	// Magic
-	str += fmt.Sprintf("Magic: %d\n", module.Magic)
-	// Version
-	str += fmt.Sprintf("Version: %d\n", module.Version)
-	// TypeSec
-	str += module.displayTypeSec()
-
-	return str
-}
-
-func (module *Module) displayTypeSec() string {
-	displayValType := func(valTypes []common.ValType) string {
-		str := "("
-		for i, valType := range valTypes {
-			if i > 0 {
-				str += ", "
-			}
-			switch valType {
-			case common.ValTypeI32:
-				str += "i32"
-			case common.ValTypeI64:
-				str += "i64"
-			case common.ValTypeF32:
-				str += "f32"
-			case common.ValTypeF64:
-				str += "f64"
-			}
-		}
-		str += ")"
-		return str
-	}
-	str := ""
-	str += fmt.Sprintf("Type[%d]:\n", len(module.TypeSec))
-	for i, t := range module.TypeSec {
-		str += fmt.Sprintf("  type[%d]: %s->%s\n", i, displayValType(t.InputTypes), displayValType(t.ReturnTypes))
-	}
-	return str
 }
