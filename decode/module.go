@@ -57,7 +57,7 @@ type Module struct {
 	FuncSec    []common.TypeIdx
 	TableSec   []common.TableType
 	MemSec     []common.MemType
-	GlobalSec  []Global
+	GlobalSec  []*Global
 	ExportSec  []Export
 	StartSec   *common.FuncIdx
 	ElemSec    []Elem
@@ -116,8 +116,8 @@ type ImportDesc struct {
 }
 
 type Global struct {
-	Type common.GlobalType
-	Init common.Expr
+	Type *common.GlobalType
+	Init *common.Expr
 }
 
 type Export struct {
@@ -490,6 +490,22 @@ func decodeGlobalType(bs *common.SliceBytes) (*common.GlobalType, error) {
 	return globalType, nil
 }
 
+func decodeExpr(bs *common.SliceBytes) (*common.Expr, error) {
+	data := make([]byte, 0)
+	for {
+		op, err := bs.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+		if op == common.ExprEnd {
+			break
+		}
+		data = append(data, op)
+	}
+
+	return &common.Expr{Data: data}, nil
+}
+
 // decode Function Section
 func (module *Module) decodeFunctionSection(bs *common.SliceBytes) error {
 	funcCount, _, err := common.DecodeInt32(bs)
@@ -557,6 +573,29 @@ func (module *Module) decodeMemorySection(bs *common.SliceBytes) error {
 
 // decode Global Section
 func (module *Module) decodeGlobalSection(bs *common.SliceBytes) error {
+	globalCount, _, err := common.DecodeInt32(bs)
+	if err != nil {
+		return err
+	}
+
+	module.GlobalSec = make([]*Global, 0, globalCount)
+	for i := int32(0); i < globalCount; i++ {
+		globalType, err := decodeGlobalType(bs)
+		if err != nil {
+			return err
+		}
+
+		initExpr, err := decodeExpr(bs)
+		if err != nil {
+			return err
+		}
+
+		module.GlobalSec = append(module.GlobalSec, &Global{
+			Type: globalType,
+			Init: initExpr,
+		})
+	}
+
 	return nil
 }
 

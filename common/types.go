@@ -61,3 +61,7 @@ const (
 	NotMutable byte = 0x00
 	Mutable    byte = 0x01
 )
+
+const (
+	ExprEnd byte = 0x0B
+)

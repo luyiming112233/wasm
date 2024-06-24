@@ -22,6 +22,8 @@ func (module *Module) display() string {
 	str += module.displayTableSec()
 	// MemSec
 	str += module.displayMemorySec()
+	// GlobalSec
+	str += module.displayGlobalSec()
 	return str
 }
 
@@ -89,8 +91,16 @@ func displayLimits(limit *common.Limits) string {
 	return fmt.Sprintf("{min: %d, max: %d}", limit.Min, limit.Max)
 }
 
+func displayGlobal(global *Global) string {
+	return fmt.Sprintf("{type: %s, init: %s}", displayGlobalType(global.Type), displayExpr(global.Init))
+}
+
 func displayGlobalType(globalType *common.GlobalType) string {
 	return fmt.Sprintf("{valType: %s, mutable: %t}", displayValType(globalType.ValType), globalType.Mutable)
+}
+
+func displayExpr(expr *common.Expr) string {
+	return fmt.Sprintf("%v", expr.Data)
 }
 
 func (module *Module) displayFuncSec() string {
@@ -116,6 +126,15 @@ func (module *Module) displayMemorySec() string {
 	str += fmt.Sprintf("Memory[%d]:\n", len(module.MemSec))
 	for i, mem := range module.MemSec {
 		str += fmt.Sprintf("  memory[%d]: %s\n", i, displayLimits(mem.LimitsRef))
+	}
+	return str
+}
+
+func (module *Module) displayGlobalSec() string {
+	str := ""
+	str += fmt.Sprintf("Global[%d]:\n", len(module.GlobalSec))
+	for i, global := range module.GlobalSec {
+		str += fmt.Sprintf("  global[%d]: %s\n", i, displayGlobal(global))
 	}
 	return str
 }
