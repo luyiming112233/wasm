@@ -16,6 +16,8 @@ func (module *Module) display() string {
 	str += module.displayTypeSec()
 	// ImportSec
 	str += module.displayImportSec()
+	// FuncSec
+	str += module.displayFuncSec()
 	return str
 }
 
@@ -52,10 +54,9 @@ func (module *Module) displayImportSec() string {
 		case ImportTagMem:
 			return fmt.Sprintf("  memory[%d]: %s.%s, %s\n", idx, imp.Module, imp.Name, displayLimits(imp.Desc.Mem.LimitsRef))
 		case ImportTagGlobal:
-			return fmt.Sprintf("  global[%d]: %s.%s, %s\n", idx, imp.Module, imp.Name, displayGrobalType(imp.Desc.Global))
+			return fmt.Sprintf("  global[%d]: %s.%s, %s\n", idx, imp.Module, imp.Name, displayGlobalType(imp.Desc.Global))
 		default:
-			// todo lym 实现其他类型
-			panic("todo lym")
+			panic("unknown import tag")
 		}
 	}
 
@@ -84,6 +85,15 @@ func displayLimits(limit *common.Limits) string {
 	return fmt.Sprintf("{min: %d, max: %d}", limit.Min, limit.Max)
 }
 
-func displayGrobalType(globalType *common.GlobalType) string {
+func displayGlobalType(globalType *common.GlobalType) string {
 	return fmt.Sprintf("{valType: %s, mutable: %t}", displayValType(globalType.ValType), globalType.Mutable)
+}
+
+func (module *Module) displayFuncSec() string {
+	str := ""
+	str += fmt.Sprintf("Func[%d]:\n", len(module.FuncSec))
+	for i, typeIdx := range module.FuncSec {
+		str += fmt.Sprintf("  func[%d]: type=%d\n", i, typeIdx)
+	}
+	return str
 }
