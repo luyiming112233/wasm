@@ -58,8 +58,8 @@ type Module struct {
 	TableSec   []common.TableType
 	MemSec     []common.MemType
 	GlobalSec  []*Global
-	ExportSec  []Export
-	StartSec   *common.FuncIdx
+	ExportSec  []*Export
+	StartSec   common.FuncIdx
 	ElemSec    []Elem
 	CodeSec    []Code
 	DataSec    []Data
@@ -601,11 +601,56 @@ func (module *Module) decodeGlobalSection(bs *common.SliceBytes) error {
 
 // decode Export Section
 func (module *Module) decodeExportSection(bs *common.SliceBytes) error {
+	exportCount, _, err := common.DecodeInt32(bs)
+	if err != nil {
+		return err
+	}
+
+	module.ExportSec = make([]*Export, 0, exportCount)
+
+	for i := int32(0); i < exportCount; i++ {
+		export, err := decodeExport(bs)
+		if err != nil {
+			return err
+		}
+		module.ExportSec = append(module.ExportSec, export)
+	}
+
 	return nil
+}
+
+func decodeExport(bs *common.SliceBytes) (*Export, error) {
+	export := &Export{}
+
+	name, _, err := bs.ReadName()
+	if err != nil {
+		return nil, err
+	}
+	export.Name = name
+
+	tag, err := bs.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+	export.Desc.Tag = tag
+
+	idx, _, err := common.DecodeUint32(bs)
+	if err != nil {
+		return nil, err
+	}
+	export.Desc.Idx = idx
+
+	return export, nil
 }
 
 // decode Start Section
 func (module *Module) decodeStartSection(bs *common.SliceBytes) error {
+	start, _, err := common.DecodeUint32(bs)
+	if err != nil {
+		return err
+	}
+
+	module.StartSec = start
 	return nil
 }
 

@@ -24,6 +24,10 @@ func (module *Module) display() string {
 	str += module.displayMemorySec()
 	// GlobalSec
 	str += module.displayGlobalSec()
+	// ExportSec
+	str += module.displayExportSec()
+	// StartSec
+	str += module.displayStartSec()
 	return str
 }
 
@@ -137,4 +141,32 @@ func (module *Module) displayGlobalSec() string {
 		str += fmt.Sprintf("  global[%d]: %s\n", i, displayGlobal(global))
 	}
 	return str
+}
+
+func (module *Module) displayExportSec() string {
+	str := ""
+	str += fmt.Sprintf("Export[%d]:\n", len(module.ExportSec))
+	for i, exp := range module.ExportSec {
+		str += fmt.Sprintf("  export[%d]: %s\n", i, displayExportDesc(exp))
+	}
+	return str
+}
+
+func displayExportDesc(export *Export) string {
+	switch export.Desc.Tag {
+	case ExportTagFunc:
+		return fmt.Sprintf("func[%d]=%s", export.Desc.Idx, export.Name)
+	case ExportTagTable:
+		return fmt.Sprintf("table[%d]=%s", export.Desc.Idx, export.Name)
+	case ExportTagMem:
+		return fmt.Sprintf("memory[%d]=%s", export.Desc.Idx, export.Name)
+	case ExportTagGlobal:
+		return fmt.Sprintf("global[%d]=%s", export.Desc.Idx, export.Name)
+	default:
+		panic("unknown export tag")
+	}
+}
+
+func (module *Module) displayStartSec() string {
+	return fmt.Sprintf("Start: %d\n", module.StartSec)
 }
