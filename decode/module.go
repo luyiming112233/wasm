@@ -511,11 +511,47 @@ func (module *Module) decodeFunctionSection(bs *common.SliceBytes) error {
 
 // decode Table Section
 func (module *Module) decodeTableSection(bs *common.SliceBytes) error {
+	tableCount, _, err := common.DecodeInt32(bs)
+	if err != nil {
+		return err
+	}
+
+	if tableCount != 1 {
+		return fmt.Errorf("decodeTableSection failed invalid table count %d", tableCount)
+	}
+
+	module.TableSec = make([]common.TableType, 0, tableCount)
+	for i := int32(0); i < tableCount; i++ {
+		tableType, err := decodeTableType(bs)
+		if err != nil {
+			return err
+		}
+		module.TableSec = append(module.TableSec, *tableType)
+	}
+
 	return nil
 }
 
 // decode Memory Section
 func (module *Module) decodeMemorySection(bs *common.SliceBytes) error {
+	memoryCount, _, err := common.DecodeInt32(bs)
+	if err != nil {
+		return err
+	}
+
+	if memoryCount != 1 {
+		return fmt.Errorf("decodeMemorySection failed invalid memory count %d", memoryCount)
+	}
+
+	module.MemSec = make([]common.MemType, 0, memoryCount)
+	for i := int32(0); i < memoryCount; i++ {
+		memType, err := decodeMemType(bs)
+		if err != nil {
+			return err
+		}
+		module.MemSec = append(module.MemSec, *memType)
+	}
+
 	return nil
 }
 

@@ -18,6 +18,10 @@ func (module *Module) display() string {
 	str += module.displayImportSec()
 	// FuncSec
 	str += module.displayFuncSec()
+	// TableSec
+	str += module.displayTableSec()
+	// MemSec
+	str += module.displayMemorySec()
 	return str
 }
 
@@ -94,6 +98,24 @@ func (module *Module) displayFuncSec() string {
 	str += fmt.Sprintf("Func[%d]:\n", len(module.FuncSec))
 	for i, typeIdx := range module.FuncSec {
 		str += fmt.Sprintf("  func[%d]: type=%d\n", i, typeIdx)
+	}
+	return str
+}
+
+func (module *Module) displayTableSec() string {
+	str := ""
+	str += fmt.Sprintf("Table[%d]:\n", len(module.TableSec))
+	for i, table := range module.TableSec {
+		str += fmt.Sprintf("  table[%d]: %s\n", i, displayLimits(table.LimitsRef))
+	}
+	return str
+}
+
+func (module *Module) displayMemorySec() string {
+	str := ""
+	str += fmt.Sprintf("Memory[%d]:\n", len(module.MemSec))
+	for i, mem := range module.MemSec {
+		str += fmt.Sprintf("  memory[%d]: %s\n", i, displayLimits(mem.LimitsRef))
 	}
 	return str
 }
