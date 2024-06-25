@@ -28,6 +28,10 @@ func (module *Module) display() string {
 	str += module.displayExportSec()
 	// StartSec
 	str += module.displayStartSec()
+	// ElementSec
+	str += module.displayElementSec()
+	// CodeSec
+	str += module.displayCodeSec()
 	return str
 }
 
@@ -169,4 +173,54 @@ func displayExportDesc(export *Export) string {
 
 func (module *Module) displayStartSec() string {
 	return fmt.Sprintf("Start: %d\n", module.StartSec)
+}
+
+func (module *Module) displayElementSec() string {
+	str := ""
+	str += fmt.Sprintf("Element[%d]:\n", len(module.ElemSec))
+
+	for i, elem := range module.ElemSec {
+		str += fmt.Sprintf("  elem[%d]: %s\n", i, displayElement(elem))
+	}
+
+	return str
+}
+
+func displayElement(elem *Elem) string {
+	str := fmt.Sprintf("table=%d, offset=%s, init=[", elem.Table, displayExpr(elem.Offset))
+	for i, init := range elem.Init {
+		if i > 0 {
+			str += ", "
+		}
+		str += fmt.Sprintf("%d", init)
+	}
+	str += "]"
+	return str
+}
+
+func (module *Module) displayCodeSec() string {
+	str := ""
+	str += fmt.Sprintf("Code[%d]:\n", len(module.CodeSec))
+
+	for i, code := range module.CodeSec {
+		str += fmt.Sprintf("  code[%d]: %s\n", i, displayCode(code))
+	}
+
+	return str
+}
+
+func displayCode(code *Code) string {
+	str := "locals: "
+
+	for i, loc := range code.Locals {
+		if i != 0 {
+			str += ", "
+		}
+		str += fmt.Sprintf("[%s x %d]", displayValType(loc.Type), loc.N)
+	}
+
+	str += fmt.Sprintf("\nbody: %s", displayExpr(code.Expr))
+	fmt.Println(str)
+
+	return str
 }

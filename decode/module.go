@@ -60,9 +60,9 @@ type Module struct {
 	GlobalSec  []*Global
 	ExportSec  []*Export
 	StartSec   common.FuncIdx
-	ElemSec    []Elem
-	CodeSec    []Code
-	DataSec    []Data
+	ElemSec    []*Elem
+	CodeSec    []*Code
+	DataSec    []*Data
 }
 
 // DecodeModule decodes a `raw` module from io.Reader whose index spaces are yet to be initialized
@@ -131,13 +131,13 @@ type ExportDesc struct {
 
 type Elem struct {
 	Table  common.TableIdx
-	Offset common.Expr
+	Offset *common.Expr
 	Init   []common.FuncIdx
 }
 
 type Code struct {
 	Locals []Locals
-	Expr   common.Expr
+	Expr   *common.Expr
 }
 type Locals struct {
 	N    uint32
@@ -656,12 +656,126 @@ func (module *Module) decodeStartSection(bs *common.SliceBytes) error {
 
 // decode Element Section
 func (module *Module) decodeElementSection(bs *common.SliceBytes) error {
+	elementCount, _, err := common.DecodeInt32(bs)
+	if err != nil {
+		return err
+	}
+
+	module.ElemSec = make([]*Elem, 0, elementCount)
+	for i := int32(0); i < elementCount; i++ {
+		elem, err := decodeElement(bs)
+		if err != nil {
+			return err
+		}
+		module.ElemSec = append(module.ElemSec, elem)
+	}
+
 	return nil
+}
+
+func decodeElement(bs *common.SliceBytes) (*Elem, error) {
+	elem := &Elem{}
+
+	tableIdx, _, err := common.DecodeUint32(bs)
+	if err != nil {
+		return nil, err
+	}
+	elem.Table = common.TableIdx(tableIdx)
+
+	offset, err := decodeExpr(bs)
+	if err != nil {
+		return nil, err
+	}
+	elem.Offset = offset
+
+	funcCount, _, err := common.DecodeInt32(bs)
+	if err != nil {
+		return nil, err
+	}
+
+	elem.Init = make([]common.FuncIdx, 0, funcCount)
+	for i := int32(0); i < funcCount; i++ {
+		funcIdx, _, err := common.DecodeUint32(bs)
+		if err != nil {
+			return nil, err
+		}
+		elem.Init = append(elem.Init, common.FuncIdx(funcIdx))
+	}
+
+	return elem, nil
 }
 
 // decode Code Section
 func (module *Module) decodeCodeSection(bs *common.SliceBytes) error {
+	codeCount, _, err := common.DecodeInt32(bs)
+	if err != nil {
+		return err
+	}
+
+	module.CodeSec = make([]*Code, 0, codeCount)
+	for i := int32(0); i < codeCount; i++ {
+		code, err := decodeCode(bs)
+		if err != nil {
+			return err
+		}
+		module.CodeSec = append(module.CodeSec, code)
+
+	}
 	return nil
+}
+
+func decodeCode(bs *common.SliceBytes) (*Code, error) {
+	// decode byte_count
+	ss, _, err := common.DecodeUint32(bs)
+	if err != nil {
+		if err != nil {
+			return nil, fmt.Errorf("get the size of code segment: %d err %w", ss, err)
+		}
+	}
+
+	code := &Code{}
+
+	// locals
+	var localSize int
+	localCount, size, err := common.DecodeUint32(bs)
+	if err != nil {
+		return nil, err
+	}
+	localSize += size
+
+	locals := make([]Locals, 0, localCount)
+	for i := uint32(0); i < localCount; i++ {
+		n, size, err := common.DecodeUint32(bs)
+		if err != nil {
+			return nil, err
+		}
+		localSize += size
+
+		valType, err := decodeValueType(bs)
+		if err != nil {
+			return nil, err
+		}
+		localSize += 1
+
+		locals = append(locals, Locals{N: n, Type: valType})
+	}
+	code.Locals = locals
+
+	// expr
+	exprLen := int(ss) - localSize
+	if exprLen < 0 {
+		return nil, fmt.Errorf("invalid expr len %d", exprLen)
+	}
+
+	exprData, err := bs.ReadByteN(exprLen)
+	if err != nil {
+		return code, err
+	}
+	code.Expr = &common.Expr{
+		Data: exprData,
+	}
+
+	return code, nil
 }
 
 // decode Data Section
