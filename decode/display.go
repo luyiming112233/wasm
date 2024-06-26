@@ -32,6 +32,8 @@ func (module *Module) display() string {
 	str += module.displayElementSec()
 	// CodeSec
 	str += module.displayCodeSec()
+	// DataSec
+	str += module.displayDataSec()
 	return str
 }
 
@@ -223,4 +225,18 @@ func displayCode(code *Code) string {
 	fmt.Println(str)
 
 	return str
+}
+
+func (module *Module) displayDataSec() string {
+	str := ""
+	str += fmt.Sprintf("Data[%d]:\n", len(module.DataSec))
+	for i, data := range module.DataSec {
+		str += fmt.Sprintf("  data[%d]: %s\n", i, displayData(data))
+	}
+
+	return str
+}
+
+func displayData(data *Data) string {
+	return fmt.Sprintf("mem=%d, offset=%s, init=%v", data.Mem, displayExpr(data.Offset), data.Init)
 }

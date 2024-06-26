@@ -146,7 +146,7 @@ type Locals struct {
 
 type Data struct {
 	Mem    common.MemIdx
-	Offset common.Expr
+	Offset *common.Expr
 	Init   []byte
 }
 
@@ -229,20 +229,20 @@ func (module *Module) decodeCustomSection(bs *common.SliceBytes) error {
 	customSec := CustomSec{}
 
 	// read byte_count
-	sectionLen, n, err := common.DecodeInt32(bs)
+	sectionLen, _, err := common.DecodeUint32(bs)
 	if err != nil {
 		return err
 	}
 
 	// read name
-	var nameLen int
+	var readLen int
 
-	if customSec.Name, nameLen, err = bs.ReadName(); err != nil {
+	if customSec.Name, readLen, err = bs.ReadName(); err != nil {
 		return err
 	}
 
 	// read bytes
-	num := int(sectionLen) - n - nameLen
+	num := int(sectionLen) - readLen
 	if customSec.Bytes, err = bs.ReadByteN(num); err != nil {
 		return err
 	}
@@ -780,5 +780,51 @@ func decodeCode(bs *common.SliceBytes) (*Code, error) {
 
 // decode Data Section
 func (module *Module) decodeDataSection(bs *common.SliceBytes) error {
+	// decode data account
+	dataCount, _, err := common.DecodeInt32(bs)
+	if err != nil {
+		return err
+	}
+
+	module.DataSec = make([]*Data, 0, dataCount)
+	for i := int32(0); i < dataCount; i++ {
+		data, err := decodeData(bs)
+		if err != nil {
+			return err
+		}
+		module.DataSec = append(module.DataSec, data)
+	}
+
 	return nil
+}
+
+func decodeData(bs *common.SliceBytes) (*Data, error) {
+	data := &Data{}
+
+	// index
+	memoryIdx, _, err := common.DecodeUint32(bs)
+	if err != nil {
+		return nil, err
+	}
+	data.Mem = common.MemIdx(memoryIdx)
+
+	// offset
+	offset, err := decodeExpr(bs)
+	if err != nil {
+		return nil, err
+	}
+	data.Offset = offset
+
+	// num_element
+	initLen, _, err := common.DecodeUint32(bs)
+	if err != nil {
+		return nil, err
+	}
+	initData, err := bs.ReadByteN(int(initLen))
+	if err != nil {
+		return nil, err
+	}
+	data.Init = initData
+
+	return data, nil
 }

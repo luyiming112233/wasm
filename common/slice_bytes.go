@@ -58,12 +58,12 @@ func (bt *SliceBytes) ReadUint32() (uint32, error) {
 }
 
 func (bt *SliceBytes) Remaining() int {
-	return len(bt.bs) - bt.pc
+	return len(bt.bs) - bt.pc - 1
 }
 
 func (bt *SliceBytes) ReadName() (string, int, error) {
 	// 读取name的长度
-	nameLen, _, err := DecodeInt32(bt)
+	nameLen, nameLenSize, err := DecodeUint32(bt)
 	if err != nil {
 		return "", 0, err
 	}
@@ -72,5 +72,5 @@ func (bt *SliceBytes) ReadName() (string, int, error) {
 	if err != nil {
 		return "", 0, err
 	}
-	return string(name), int(nameLen), nil
+	return string(name), int(nameLen) + nameLenSize, nil
 }
